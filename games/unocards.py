@@ -6,8 +6,9 @@ Match the top card by COLOUR or by NUMBER / SYMBOL. Special cards:
     +2                          - the next player draws two and is skipped
     Wild (four colours)         - you choose the colour
     Wild +4                     - choose the colour, the next player draws four and is skipped
-Can't play? Draw a card (click the deck or press SPACE): if it fits you may play it,
-otherwise the turn passes. First to empty their hand wins.
+Can't play? Draw a card (click the deck or press SPACE): if it fits you may play it
+(or click the deck again to pass), otherwise the turn passes. There are no on-screen hints
+while playing: you must spot the playable cards yourself. First to empty their hand wins.
 
 Difficulties: Easy (2 opponents, random CPU), Medium (3 opponents, smarter CPU),
 Hard (3 opponents, tactical CPU and you MUST call Last Card (L) before playing your
@@ -441,9 +442,9 @@ class LastCard(ov.BaseGame):
             return
         if self._playable(got[0]):
             self.drawn = self.hands[0].index(got[0])
-            self.say("You drew a playable card - play it or pass (SPACE)")
+            self.say("You draw a card")
         else:
-            self.say("You draw a card - no luck, next player")
+            self.say("You draw a card")
             self.turn = self._next(0)
             self.wait = 0.9
 
@@ -452,6 +453,7 @@ class LastCard(ov.BaseGame):
             return
         card = self.hands[0][idx]
         if self.drawn is not None and idx != self.drawn:
+            self.say("You can only play the card you drew")
             return
         if not self._playable(card):
             self.say("That card doesn't match")
@@ -578,7 +580,7 @@ class LastCard(ov.BaseGame):
             pts.append((cx + x * ca - y * sa, cy + x * sa + y * ca))
         return pts
 
-    def _card_face(self, c, card, x, y, w=CW, h=CH, dim=False, glow=None):
+    def _card_face(self, c, card, x, y, w=CW, h=CH, dim=False, glow=None, bare=False):
         """x, y = bottom-left."""
         col, k = card
         base = COLORS.get(col, (0.12, 0.12, 0.16, 1.0))
@@ -591,6 +593,10 @@ class LastCard(ov.BaseGame):
         cx, cy = x + w / 2, y + h / 2
         ang = math.radians(-24)
         self._poly(c, self._oval(cx, cy, w * 0.40, h * 0.30, ang), (0.97, 0.97, 0.98, 1))
+        if bare:                                       # card buried in a pile: no symbol, no digits
+            if dim:
+                self._rr(c, x, y, w, h, 7 * s, (0, 0, 0, 0.42))
+            return
         dark = (base[0] * 0.78, base[1] * 0.78, base[2] * 0.78, 1.0)
         if col == 'W':
             for q in range(4):
@@ -619,13 +625,13 @@ class LastCard(ov.BaseGame):
         if dim:
             self._rr(c, x, y, w, h, 7 * s, (0, 0, 0, 0.42))
 
-    def _card_back(self, c, x, y, w=CW, h=CH):
+    def _card_back(self, c, x, y, w=CW, h=CH, label=True):
         s = w / CW
         self._rr(c, x + 2 * s, y - 3 * s, w, h, 7 * s, (0, 0, 0, 0.30))
         self._rr(c, x, y, w, h, 7 * s, (0.97, 0.97, 0.98, 1))
         self._rr(c, x + 3 * s, y + 3 * s, w - 6 * s, h - 6 * s, 5 * s, (0.10, 0.10, 0.14, 1))
         self._poly(c, self._oval(x + w / 2, y + h / 2, w * 0.40, h * 0.28, math.radians(-24)), (0.88, 0.18, 0.2, 1))
-        if w > 40:
+        if w > 40 and label:
             self._text(c, "GTLP", x + w / 2, y + h / 2, 13 * s, (1.0, 0.9, 0.2, 1))
 
     def _seat(self, p):
@@ -703,16 +709,14 @@ class LastCard(ov.BaseGame):
         self._circ(c, ccx, ccy, RING_R, (cc[0], cc[1], cc[2], 0.22), 40)
         c.ring(self._X(ccx), self._Y(ccy), RING_R * self.sc, 4 * self.sc, (cc[0], cc[1], cc[2], 0.9), 48)
         dx, dy, dw, dh = self._deck_rect()
-        for k in range(3):
-            self._card_back(c, dx - k * 1.4, dy + k * 1.4)
+        for k in range(3):                                                      # only the top card shows the logo
+            self._card_back(c, dx - k * 1.4, dy + k * 1.4, label=(k == 2))
         self._rr(c, dx + dw / 2 - 15, dy - 25, 30, 16, 7, (0, 0, 0, 0.55))      # pile counter pill
         self._text(c, "%d" % len(self.pile), dx + dw / 2, dy - 17, 10, ov.C_WHITE)
-        if self.turn == 0 and self.phase == 'play':
-            self._text(c, "DRAW" if self.drawn is None else "PASS", dx + dw / 2, dy + dh + 12, 10, ov.C_GOLD)
         top3 = self.disc[-3:]
         for k, card in enumerate(top3):
             depth = len(top3) - 1 - k                                           # top card = 0
-            self._card_face(c, card, DISC_X - depth * 2.5, PILE_Y + depth * 2.0, CW, CH)
+            self._card_face(c, card, DISC_X - depth * 2.5, PILE_Y + depth * 2.0, CW, CH, bare=depth > 0)
         # direction arrows (they travel along the colour ring, outside the cards)
         for sg in (-1, 1):
             a = self.time * 1.2 * self.dir + (0 if sg > 0 else math.pi)
@@ -741,11 +745,10 @@ class LastCard(ov.BaseGame):
         n = len(self.hands[0])
         x0, step = self._hand_geom()
         for i, card in enumerate(self.hands[0]):
-            ok = self.phase == 'play' and self.turn == 0 and self._playable(card) and (self.drawn is None or i == self.drawn)
-            hov = i == self.hover and ok
-            lift = 16.0 if hov else (6.0 if ok and self.turn == 0 else 0.0)
-            glow = (1.0, 0.9, 0.3, 0.9) if (hov or (self.drawn is not None and i == self.drawn)) else None
-            self._card_face(c, card, x0 + i * step, 8 + lift, CW, CH, dim=not ok and self.turn == 0 and self.phase in ('play', 'color'), glow=glow)
+            hov = i == self.hover and self.phase == 'play' and self.turn == 0     # only the card under the mouse is lifted
+            lift = 16.0 if hov else 0.0
+            glow = (1.0, 0.9, 0.3, 0.9) if hov else None
+            self._card_face(c, card, x0 + i * step, 8 + lift, CW, CH, glow=glow)
         self._rr(c, W / 2 - 40, 124, 80, 20, 9, (0, 0, 0, 0.5))
         self._text(c, "You  %d" % n, W / 2, 134, 10.5, (1.0, 0.9, 0.4, 1) if self.turn == 0 and self.phase == 'play' else ov.C_WHITE)
         if self.cfg['last_card_call'] and self.turn == 0 and n == 2 and self.phase == 'play':
@@ -775,10 +778,8 @@ class LastCard(ov.BaseGame):
             else:
                 self._text(c, "Cards left: " + "  ".join("%s %d" % (NAMES[i], len(h)) for i, h in enumerate(self.hands)), W / 2, 260, 13, ov.C_TEXT)
             self._text(c, "SPACE / click: new game     M: difficulty", W / 2, 180, 13, ov.C_TEXT)
-        if self.cfg['last_card_call']:
-            self.draw_hint(c, "Click a card   deck / SPACE: draw or pass   L: call Last Card   N new   M menu")
-        else:
-            self.draw_hint(c, "Click a card   deck / SPACE: draw or pass   N new   M menu   R restart")
+        if self.phase == 'over':
+            self.draw_hint(c, "SPACE / click: new game   M: difficulty")
 
 
 RUNNER = ov.Runner("unocards", GAME_NAME, LastCard, [

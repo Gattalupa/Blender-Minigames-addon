@@ -1,10 +1,11 @@
-"""Mini Golf - 9 holes (3 easy, 3 medium, 3 hard), drawn as a GPU overlay.
+"""Mini Golf - 20 holes (3 easy warm-ups, then 7 medium and 10 hard), drawn as a GPU overlay.
 
 Aim with the mouse (the ball shoots TOWARDS the cursor, the farther the cursor
-the harder the shot) and click to putt. Sand slows the ball, ice makes it slide,
+the harder the shot) and click to putt. The power matters: a ball that is too fast
+flies over the cup, it only drops in when it is slow enough. Sand slows the ball, ice makes it slide,
 water costs a stroke, windmills and sliding gates move. Fewer strokes is better.
 
-Records are saved for every hole (golf_hole_1 ... golf_hole_9): the best number
+Records are saved for every hole (golf_hole_1 ... golf_hole_20): the best number
 of strokes and the best time.
 """
 
@@ -23,7 +24,12 @@ CELL = 20.0
 GW, GH = 32, 20
 BALL_R = 5.0
 CUP_R = 8.5
-MAX_SPEED = 640.0
+MAX_SPEED = 1150.0                    # full power (was 640)
+POWER_CURVE = 1.5                     # >1 = finer control on short putts
+CUP_SINK_EDGE = 150.0                 # max speed (px/s) at which a ball that touches the rim of the cup drops in
+CUP_SINK_CENTER = 290.0               # ... and the max speed when it crosses the exact centre
+CUP_PULL_R = 14.0                     # slow balls this close to the cup are pulled in
+CUP_PULL_SPEED = 170.0
 MAX_STROKES = 12
 SCORE_BASE = 100                      # saved score = SCORE_BASE - strokes (higher is better)
 
@@ -49,8 +55,13 @@ DIGITS = {n: i for i, n in enumerate(
 DIGITS.update({'NUMPAD_%d' % (i + 1): i for i in range(9)})
 
 
+def shot_speed(power):
+    """Ball speed for a power in 0..1 (non-linear: fine control for short putts, a very hard max)."""
+    return 60.0 + (MAX_SPEED - 60.0) * (max(0.0, min(1.0, power)) ** POWER_CURVE)
+
+
 # ----------------------------------------------------------------------------
-# Holes (built on a 32 x 20 grid: '#' wall, '.' grass, 'S' sand, 'I' ice, 'W' water)
+# Holes (20, built on a 32 x 20 grid: '#' wall, '.' grass, 'S' sand, 'I' ice, 'W' water)
 # ----------------------------------------------------------------------------
 
 class Hole:
@@ -84,6 +95,7 @@ class Hole:
 
 def _make_holes():
     hs = []
+    # ---- 1-3: simple warm-ups
     h = Hole("Warm-up", 2, 0).carve(2, 7, 29, 12)
     h.tee, h.cup = (4, 9), (27, 9)
     hs.append(h)
@@ -96,6 +108,7 @@ def _make_holes():
     h.tee, h.cup = (4, 8), (27, 11)
     hs.append(h)
 
+    # ---- 4-10: medium
     h = Hole("Water Bridge", 3, 1).carve(2, 4, 29, 15).carve(11, 4, 16, 15, 'W').carve(11, 9, 16, 10)
     h.tee, h.cup = (4, 9), (26, 10)
     hs.append(h)
@@ -110,15 +123,91 @@ def _make_holes():
     h.blades.append((cx + 10, cy - 10, 62.0, 1.7, 0.0))
     hs.append(h)
 
-    h = Hole("Ice Rink", 4, 2).carve(2, 3, 29, 16, 'I')
+    h = Hole("Bumper Alley", 3, 1).carve(2, 5, 29, 14)
+    h.tee, h.cup = (4, 9), (27, 9)
+    h.bumpers += [h.pos(10, 7), h.pos(10, 12), h.pos(15, 9), h.pos(20, 7), h.pos(20, 12)]
+    hs.append(h)
+
+    h = Hole("Island Hop", 4, 1).carve(2, 3, 29, 16)
+    h.carve(8, 3, 12, 16, 'W').carve(8, 9, 12, 10)                 # first river, one narrow bridge
+    h.carve(19, 3, 23, 16, 'W').carve(19, 4, 23, 5).carve(19, 14, 23, 15)   # second river, two bridges
+    h.carve(15, 8, 16, 11, 'S')
+    h.tee, h.cup = (4, 9), (27, 5)
+    hs.append(h)
+
+    h = Hole("Ice Rink", 4, 1).carve(2, 3, 29, 16, 'I')
     h.wall(8, 6, 9, 7).wall(14, 11, 15, 13).wall(20, 4, 21, 6).wall(22, 13, 23, 14)
     h.tee, h.cup = (4, 15), (27, 4)
     hs.append(h)
 
+    h = Hole("Twin Mills", 4, 1).carve(2, 5, 29, 14)
+    h.tee, h.cup = (4, 9), (27, 9)
+    cx, cy = h.pos(11, 9)
+    h.blades.append((cx, cy, 52.0, 1.8, 0.0))
+    cx, cy = h.pos(20, 9)
+    h.blades.append((cx, cy, 52.0, -2.1, 1.0))
+    hs.append(h)
+
+    # ---- 11-20: hard
     h = Hole("Sliding Gates", 4, 2).carve(2, 5, 29, 14)
     h.tee, h.cup = (4, 9), (27, 9)
     h.sliders.append((9 * CELL + 10, 6 * CELL, 9 * CELL + 10, 13 * CELL, 18.0, 76.0, 3.2, 0.0))
     h.sliders.append((17 * CELL + 10, 6 * CELL, 17 * CELL + 10, 13 * CELL, 18.0, 76.0, 2.6, 0.5))
+    hs.append(h)
+
+    h = Hole("Ice Maze", 5, 2).carve(2, 3, 29, 16, 'I')
+    h.wall(7, 3, 8, 12).wall(13, 7, 14, 16).wall(19, 3, 20, 12).wall(25, 7, 26, 16)
+    h.tee, h.cup = (4, 15), (28, 14)
+    hs.append(h)
+
+    h = Hole("Sand Storm", 4, 2).carve(2, 3, 29, 16)
+    h.carve(8, 3, 12, 16, 'S').carve(18, 3, 22, 16, 'S')
+    h.wall(15, 3, 16, 9).wall(15, 12, 16, 16)
+    h.tee, h.cup = (4, 9), (27, 9)
+    h.bumpers += [h.pos(25, 6), h.pos(25, 13)]
+    hs.append(h)
+
+    h = Hole("Slalom", 5, 2).carve(2, 3, 29, 16)
+    h.wall(8, 3, 9, 12).wall(13, 7, 14, 16).wall(18, 3, 19, 12).wall(23, 7, 24, 16)
+    h.tee, h.cup = (4, 4), (27, 15)
+    h.bumpers += [h.pos(9, 14), h.pos(14, 4), h.pos(19, 14), h.pos(24, 4)]
+    hs.append(h)
+
+    h = Hole("Frozen Lake", 4, 2).carve(2, 3, 29, 16, 'I')
+    h.carve(11, 7, 20, 12, 'W').wall(15, 3, 16, 4).wall(15, 15, 16, 16)
+    h.tee, h.cup = (4, 9), (27, 9)
+    hs.append(h)
+
+    h = Hole("Gauntlet", 5, 2).carve(2, 5, 29, 14).carve(7, 5, 9, 14, 'S')
+    h.tee, h.cup = (4, 9), (27, 9)
+    h.sliders.append((14 * CELL + 10, 6 * CELL, 14 * CELL + 10, 13 * CELL, 18.0, 76.0, 2.8, 0.0))
+    cx, cy = h.pos(21, 9)
+    h.blades.append((cx, cy, 55.0, 2.0, 0.0))
+    hs.append(h)
+
+    h = Hole("Pinball", 4, 2).carve(2, 3, 29, 16, 'I')
+    h.tee, h.cup = (4, 9), (28, 14)
+    h.bumpers += [h.pos(10, 6), h.pos(10, 13), h.pos(14, 9), h.pos(18, 5), h.pos(18, 13),
+                  h.pos(22, 9), h.pos(25, 5)]
+    hs.append(h)
+
+    h = Hole("Spiral", 6, 2).carve(2, 2, 29, 17)
+    h.wall(4, 4, 27, 15)                                         # ring 0 (outer corridor, 2 cells wide)
+    h.carve(5, 5, 26, 14, 'I').wall(7, 7, 24, 12)                # ring 1 (ice)
+    h.carve(8, 8, 23, 11)                                        # centre
+    h.wall(2, 10, 3, 11)                                         # blocks the shortcut up the left side
+    h.carve(4, 5, 4, 6)                                          # door ring 0 -> ring 1
+    h.wall(5, 7, 6, 8)                                           # blocks the shortcut in ring 1
+    h.carve(7, 9, 7, 10)                                         # door ring 1 -> centre
+    h.tee, h.cup = (3, 16), (16, 9)
+    hs.append(h)
+
+    h = Hole("Water Maze", 5, 2).carve(2, 3, 29, 16, 'W')
+    h.carve(2, 8, 7, 12).carve(7, 9, 13, 11).carve(11, 9, 13, 16).carve(11, 14, 20, 16)
+    h.carve(18, 5, 20, 16).carve(18, 5, 26, 7).carve(24, 5, 26, 12).carve(24, 10, 29, 12)
+    h.tee, h.cup = (4, 10), (27, 11)
+    cx, cy = h.pos(22, 6)
+    h.blades.append((cx, cy, 28.0, 2.0, 0.0))
     hs.append(h)
 
     h = Hole("Grand Finale", 5, 2).carve(2, 2, 29, 17)
@@ -131,6 +220,8 @@ def _make_holes():
     h.blades.append((cx, cy, 52.0, -2.0, 0.0))
     hs.append(h)
 
+    for i, hole in enumerate(hs):                    # difficulty colour: 1-3 easy, 4-10 medium, 11-20 hard
+        hole.tier = 0 if i < 3 else 1 if i < 10 else 2
     for hole in hs:                                  # tee / cup squares must be playable ground
         for (x, y) in (hole.tee, hole.cup):
             if hole.g[y][x] in 'W#':
@@ -164,7 +255,8 @@ class Ball:
 
 
 class MiniGolf(ov.BaseGame):
-    keys = tuple(DIGITS) + ('SPACE', 'N', 'M', 'LEFT_ARROW', 'RIGHT_ARROW', 'UP_ARROW', 'DOWN_ARROW')
+    keys = tuple(DIGITS) + ('SPACE', 'N', 'B', 'M', 'RET', 'NUMPAD_ENTER',
+                            'LEFT_ARROW', 'RIGHT_ARROW', 'UP_ARROW', 'DOWN_ARROW')
 
     # ---------------------------------------------------------------- setup
     def setup(self):
@@ -365,11 +457,14 @@ class MiniGolf(ov.BaseGame):
             dx, dy = self.cup[0] - b.x, self.cup[1] - b.y
             d = math.hypot(dx, dy)
             s = b.speed()
-            if d < CUP_R and s < 430.0:
-                return 'sunk'
-            if d < 16.0 and s < 190.0 and d > 1e-6:      # the cup pulls slow balls in
-                b.vx += dx / d * 520.0 * h
-                b.vy += dy / d * 520.0 * h
+            if d < CUP_R:
+                # the ball only drops in when it is slow enough: the closer to the centre, the faster it may be
+                v_sink = CUP_SINK_EDGE + (CUP_SINK_CENTER - CUP_SINK_EDGE) * (1.0 - d / CUP_R)
+                if s < v_sink:
+                    return 'sunk'
+            if d < CUP_PULL_R and s < CUP_PULL_SPEED and d > 1e-6:      # the cup pulls slow balls in
+                b.vx += dx / d * 420.0 * h
+                b.vy += dy / d * 420.0 * h
         return None
 
     # --------------------------------------------------------------- shots
@@ -385,7 +480,7 @@ class MiniGolf(ov.BaseGame):
         if self.state != 'aim' or self.menu:
             return
         b = self.ball
-        sp = 70.0 + (MAX_SPEED - 70.0) * self.aim_pow
+        sp = shot_speed(self.aim_pow)
         b.vx, b.vy = math.cos(self.aim_ang) * sp, math.sin(self.aim_ang) * sp
         self.rest = (b.x, b.y)
         self.strokes += 1
@@ -395,6 +490,9 @@ class MiniGolf(ov.BaseGame):
 
     def _next_hole(self):
         self._load((self.hole_i + 1) % len(HOLES))
+
+    def _prev_hole(self):
+        self._load((self.hole_i - 1) % len(HOLES))
 
     # ----------------------------------------------------------------- update
     def update(self, dt):
@@ -463,9 +561,9 @@ class MiniGolf(ov.BaseGame):
         return (x - self.fx0) / self.sc, (y - self.fy0) / self.sc
 
     def _card(self, i):
-        col, row = i % 3, i // 3
-        w, h = 200.0, 104.0
-        return 10.0 + col * (w + 10.0), 262.0 - row * (h + 9.0), w, h
+        col, row = i % 5, i // 5                      # 5 columns x 4 rows = 20 holes
+        w, h = 120.0, 84.0
+        return 4.0 + col * (w + 8.0), 282.0 - row * (h + 8.0), w, h
 
     def _card_idx(self, x, y):
         lx, ly = self._logical(x, y)
@@ -520,12 +618,27 @@ class MiniGolf(ov.BaseGame):
             i = DIGITS.get(key)
             if i is not None and i < len(HOLES):
                 self._start_hole(i)
+                return
+            cur = self.menu_hover if self.menu_hover >= 0 else self.hole_i
+            if key == 'LEFT_ARROW':
+                self.menu_hover = (cur - 1) % len(HOLES)
+            elif key == 'RIGHT_ARROW':
+                self.menu_hover = (cur + 1) % len(HOLES)
+            elif key == 'UP_ARROW':
+                self.menu_hover = cur - 5 if cur >= 5 else cur
+            elif key == 'DOWN_ARROW':
+                self.menu_hover = cur + 5 if cur + 5 < len(HOLES) else cur
+            elif key in ('RET', 'NUMPAD_ENTER', 'SPACE'):
+                self._start_hole(cur)
             return
         if key == 'M':
             self.menu, self.menu_hover = True, -1
         elif key == 'N':
             if self.state in ('done', 'fail', 'aim'):
                 self._next_hole()
+        elif key == 'B':
+            if self.state in ('done', 'fail', 'aim'):
+                self._prev_hole()
         elif key == 'SPACE':
             if self.state == 'aim':
                 self._shoot()
@@ -678,7 +791,7 @@ class MiniGolf(ov.BaseGame):
         tier = self.hole.tier
         horizon = (2.4, 0.8, 0.22)[tier]
         ca, sa = math.cos(self.aim_ang), math.sin(self.aim_ang)
-        sp = 70.0 + (MAX_SPEED - 70.0) * self.aim_pow
+        sp = shot_speed(self.aim_pow)
         p = Ball(b.x, b.y)
         p.vx, p.vy = ca * sp, sa * sp
         pts, t, acc = [], 0.0, 0.0
@@ -719,19 +832,19 @@ class MiniGolf(ov.BaseGame):
             col = TIER_COL[hole.tier]
             self._rect(c, x + 2, y - 3, w, h, (0, 0, 0, 0.35))
             self._rect(c, x, y, w, h, ov.C_CELL_HOVER if hov else ov.C_CELL)
-            self._rect(c, x, y, 7, h, col)
-            self._rect(c, x + 7, y + h - 3, w - 7, 3, ov.alpha(col, 0.7))
-            self._text(c, "%d  %s" % (i + 1, hole.name), x + 18, y + h - 22, 16, ov.C_WHITE, 'left')
-            self._text(c, "%s   -   Par %d" % (TIER_NAME[hole.tier], hole.par), x + 18, y + h - 44, 11, col, 'left')
+            self._rect(c, x, y, 5, h, col)
+            self._rect(c, x + 5, y + h - 3, w - 5, 3, ov.alpha(col, 0.7))
+            self._text(c, "%d  %s" % (i + 1, hole.name), x + 12, y + h - 17, 11, ov.C_WHITE, 'left')
+            self._text(c, "%s - Par %d" % (TIER_NAME[hole.tier], hole.par), x + 12, y + h - 32, 9, col, 'left')
             bs, bt = self._best(i)
             if bs is None:
-                self._text(c, "Not played yet", x + 18, y + 24, 12, ov.C_TEXT, 'left')
+                self._text(c, "Not played", x + 12, y + 14, 9.5, ov.C_TEXT, 'left')
             else:
-                self._text(c, "Best  %d stroke%s" % (bs, "" if bs == 1 else "s"), x + 18, y + 38, 12, ov.C_GOLD, 'left')
-                self._text(c, "Best time  %s" % _fmt_time(bt), x + 18, y + 20, 12, ov.C_GOLD, 'left')
+                self._text(c, "Best %d" % bs, x + 12, y + 28, 10, ov.C_GOLD, 'left')
+                self._text(c, _fmt_time(bt), x + 12, y + 14, 10, ov.C_GOLD, 'left')
             # mini preview
-            pw, ph = 62.0, 39.0
-            px0, py0 = x + w - pw - 10, y + 12
+            pw, ph = 40.0, 25.0
+            px0, py0 = x + w - pw - 8, y + 8
             self._rect(c, px0 - 1, py0 - 1, pw + 2, ph + 2, (0, 0, 0, 0.5))
             for row in range(GH):
                 for k in range(GW):
@@ -746,9 +859,9 @@ class MiniGolf(ov.BaseGame):
         hole = self.hole
         bs, bt = self._best(self.hole_i)
         if self.menu:
-            self.draw_header(c, "MINI GOLF", "9 holes   -   fewer strokes and faster time = better", ov.C_GOLD)
+            self.draw_header(c, "MINI GOLF", "20 holes   -   fewer strokes and faster time = better", ov.C_GOLD)
             self._draw_menu(c)
-            self.draw_hint(c, "Click a hole or press 1-9   ESC quit")
+            self.draw_hint(c, "Click a hole, arrows + ENTER, or 1-9   ESC quit")
             return
         main = "Hole %d - %s" % (self.hole_i + 1, hole.name)
         sub = "Par %d   |   Strokes %d   |   Time %s   |   Best %s (%s)" % (
@@ -778,16 +891,16 @@ class MiniGolf(ov.BaseGame):
         if self.state == 'aim':
             self.draw_hint(c, "Mouse: aim & power   Click / SPACE: putt   Arrows: fine aim   M holes   R retry")
         else:
-            self.draw_hint(c, "N next hole   M holes   R retry   ESC quit")
+            self.draw_hint(c, "N next hole   B previous   M holes   R retry   ESC quit")
 
 
 RUNNER = ov.Runner("minigolf", GAME_NAME, MiniGolf, [
-    "Mouse: aim (cursor distance = power)",
+    "Mouse: aim (cursor distance = power; too strong flies over the cup)",
     "LMB / SPACE: putt",
     "Arrows: fine aim and power",
     "Sand slows, ice slides, water = +1 stroke",
     "Best strokes and best time per hole",
-    "M: hole menu   N: next   R: retry   ESC: quit",
+    "M: hole menu   N / B: next / previous   R: retry   ESC: quit",
 ])
 
 
