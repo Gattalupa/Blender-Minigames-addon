@@ -21,7 +21,7 @@ Built purely for fun, experimentation, and the questionable decision to turn Ble
 
 Tested on Blender 5.2+ (Windows).
 
-Made by [gattalupa.com](https://gattalupa.com) — info and contacts available on the website.
+Made by [gattalupa.com](https://gattalupa.com), info and contacts available on the website.
 
 
 All games are original implementations inspired by classic genres. All trademarks belong to their respective owners; this project is not affiliated with or endorsed by them.
