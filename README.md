@@ -5,6 +5,9 @@ A collection of classic minigames playable directly inside Blender.
 Includes games such as Pong, Bubble Bobble-style, Battleship, Dice, Space Invaders-style, Chess, Fighting Game, Penalty Shootout, Mastermind-style, Connect Four, 2048, Frogger-style, a Metal Slug-inspired shooter, Golf, a Racing Game with Perks, Minesweeper-style, Pac-Man-style, Tamagotchi-style, Rhythm Game, Snake, Poker, Sudoku, and more.
 You can see the full list inside "games" folder.
 
+<img width="2114" height="1390" alt="minigames" src="https://github.com/user-attachments/assets/6cf6bf0e-80b0-4987-95da-bdd3d26a717b" />
+
+
 Each game features multiple selectable difficulty levels, so you can choose your preferred challenge. 
 Your best time or highest score is saved, giving you a reason to come back and try to beat your own records.
 
