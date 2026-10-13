@@ -2,7 +2,7 @@ Blender Minigames Add-on 🎮
 
 A collection of classic minigames playable directly inside Blender.
 
-Includes games such as Pong, Bubble Bobble, Battleship, Dice, Space Invaders, Chess, Checkers, Fighting Game, Penalty Shootout, Mastermind, Connect Four, 2048, Frogger, a Metal Slug-inspired shooter, Golf, a Racing Game with Perks, Minesweeper, Pac-Man, Tamagotchi, Rhythm Game, Snake, Solitaire, Sudoku, and more.
+Includes games such as Pong, Bubble Bobble-style, Battleship, Dice, Space Invaders-style, Chess, Fighting Game, Penalty Shootout, Mastermind-style, Connect Four, 2048, Frogger-style, a Metal Slug-inspired shooter, Golf, a Racing Game with Perks, Minesweeper-style, Pac-Man-style, Tamagotchi-style, Rhythm Game, Snake, Poker, Sudoku, and more.
 You can see the full list inside "games" folder.
 
 Each game features multiple selectable difficulty levels, so you can choose your preferred challenge. 
@@ -19,3 +19,6 @@ Built purely for fun, experimentation, and the questionable decision to turn Ble
 Tested on Blender 5.2+
 
 Made by [gattalupa.com](https://gattalupa.com) — info and contacts available on the website.
+
+
+All games are original implementations inspired by classic genres. All trademarks belong to their respective owners; this project is not affiliated with or endorsed by them.
