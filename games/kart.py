@@ -1,4 +1,4 @@
-"""Neon Kart - a top-down kart racer with items and "augments" (GPU overlay).
+"""Kart - a top-down kart racer with items and "augments" (GPU overlay).
 
 Steer with the MOUSE (the kart turns towards the cursor) or with A / D.
 The kart accelerates by itself; hold S to brake. Drive through the rainbow boxes
@@ -17,7 +17,7 @@ import traceback
 from . import _overlay as ov
 from . import _record as _rec
 
-GAME_NAME = "Neon Kart"
+GAME_NAME = "Kart"
 GAME_ICON = 'AUTO'
 
 W, H = 640.0, 400.0
@@ -38,12 +38,12 @@ KART_COLORS = ((0.25, 0.60, 1.00, 1.0), (0.95, 0.30, 0.30, 1.0), (0.98, 0.78, 0.
 NAMES = ("YOU", "Blaze", "Volt", "Mint", "Orchid", "Ember")
 
 TRACKS = [
-    dict(name="Green Circuit", key="green", info="Wide and friendly - gentle curves", width=84.0, cpu=0.86, rubber=0.03,
+    dict(name="Green Circuit", key="green", info="Wide and friendly - gentle curves", width=84.0, cpu=0.96, rubber=0.09,
          pts=[(0, 0), (520, -80), (1020, 40), (1260, 420), (1040, 800), (520, 900), (-60, 760), (-330, 420), (-240, 120)]),
-    dict(name="Sunset Coast", key="sunset", info="Medium: S-bends and a long sweeper", width=72.0, cpu=0.93, rubber=0.05,
+    dict(name="Sunset Coast", key="sunset", info="Medium: S-bends and a long sweeper", width=72.0, cpu=1.02, rubber=0.11,
          pts=[(0, 0), (460, -120), (900, 60), (1180, -80), (1500, 260), (1240, 640), (820, 520), (520, 840),
               (60, 900), (-360, 640), (-300, 220)]),
-    dict(name="Neon Skyline", key="neon", info="Hard: hairpins and tight chicanes", width=62.0, cpu=1.00, rubber=0.07,
+    dict(name="Neon Skyline", key="neon", info="Hard: hairpins and tight chicanes", width=62.0, cpu=1.08, rubber=0.13,
          pts=[(0, 0), (400, -180), (860, -100), (1060, 160), (820, 360), (1180, 620), (900, 980), (480, 760),
               (260, 1000), (-200, 960), (-420, 600), (-120, 420), (-440, 200)]),
 ]
@@ -227,34 +227,33 @@ class Track:
         return bi, math.sqrt(best)
 
 
-class Kart:
-    def __init__(self, i, track, slot):
-        self.i = i
-        self.col = KART_COLORS[i]
-        self.name = NAMES[i]
-        row, side = slot // 2, (-1 if slot % 2 == 0 else 1)
-        idx = (-6 - row * 6) % N_PTS
-        self.x, self.y = track.pos(idx, side * track.w * 0.22)
-        self.a = track.dir[idx]
-        self.speed = 0.0
-        self.idx = idx
-        self.prog = float(-6 - row * 6)            # progress in samples (negative = behind the line)
-        self.spin = 0.0
-        self.boost = 0.0
-        self.shield = 0.0
-        self.item = None
-        self.item_t = 0.0
-        self.finished = None
-        self.dist_c = 0.0
-        self.offroad = False
-        self.ai_t = random.uniform(0.2, 0.9)
-        self.skill = random.uniform(0.96, 1.03)
-        self.lap = 0
-
-
-class NeonKart(ov.BaseGame):
+class Kart(ov.BaseGame):
     keys = ('A', 'D', 'S', 'SPACE', 'M', 'LEFT_ARROW', 'RIGHT_ARROW', 'DOWN_ARROW',
             'ONE', 'TWO', 'THREE', 'NUMPAD_1', 'NUMPAD_2', 'NUMPAD_3')
+
+
+    def __init__(self, i, track, slot):
+            self.i = i
+            self.col = KART_COLORS[i]
+            self.name = NAMES[i]
+            row, side = slot // 2, (-1 if slot % 2 == 0 else 1)
+            idx = (-6 - row * 6) % N_PTS
+            self.x, self.y = track.pos(idx, side * track.w * 0.22)
+            self.a = track.dir[idx]
+            self.speed = 0.0
+            self.idx = idx
+            self.prog = float(-6 - row * 6)            # progress in samples (negative = behind the line)
+            self.spin = 0.0
+            self.boost = 0.0
+            self.shield = 0.0
+            self.item = None
+            self.item_t = 0.0
+            self.finished = None
+            self.dist_c = 0.0
+            self.offroad = False
+            self.ai_t = random.uniform(0.2, 0.9)
+            self.skill = random.uniform(0.99, 1.05)
+            self.lap = 0
 
     # ------------------------------------------------------------------ setup
     def setup(self):
@@ -367,10 +366,10 @@ class NeonKart(ov.BaseGame):
         else:
             top *= self.cfg['cpu'] * k.skill
             behind = self.pl.prog - k.prog
-            if behind > 25:                               # rubber band
-                top *= 1.0 + self.cfg['rubber'] * min(1.0, behind / 120.0)
-            elif behind < -40:
-                top *= 1.0 - self.cfg['rubber'] * 0.7 * min(1.0, -behind / 120.0)
+            if behind > 10:                               # rubber band
+                top *= 1.0 + self.cfg['rubber'] * min(1.0, behind / 100.0)
+            elif behind < -60:
+                top *= 1.0 - self.cfg['rubber'] * 0.25 * min(1.0, -behind / 150.0)
         if k.offroad:
             top *= 0.62 if (k is self.pl and self.aug == 'grip') else 0.48
         if k.boost > 0:
@@ -429,7 +428,7 @@ class NeonKart(ov.BaseGame):
 
     def _steer_cpu(self, k, dt):
         look = int(8 + k.speed / 28)
-        tx, ty = self.track.pos(k.idx + look, math.sin(k.i * 1.7 + k.idx * 0.02) * self.track.w * 0.2)
+        tx, ty = self.track.pos(k.idx + look, math.sin(k.i * 1.7 + k.idx * 0.02) * self.track.w * 0.1)
         want = math.atan2(ty - k.y, tx - k.x)
         err = _wrap(want - k.a)
         k.ai_t -= dt
@@ -437,13 +436,13 @@ class NeonKart(ov.BaseGame):
             it = k.item
             use = it in ('boost', 'shield')
             if it == 'rocket':
-                use = any(q is not k and 0 < q.prog - k.prog < 40 and not q.finished for q in self.karts)
+                use = any(q is not k and 0 < q.prog - k.prog < 90 and not q.finished for q in self.karts)
             elif it == 'oil':
-                use = any(q is not k and 0 < k.prog - q.prog < 25 for q in self.karts)
-            if use or k.item_t > 5.0:
+                use = any(q is not k and 0 < k.prog - q.prog < 40 for q in self.karts)
+            if use or k.item_t > 3.0:
                 self._use_item(k)
-            k.ai_t = random.uniform(0.6, 1.4)
-        return max(-1.0, min(1.0, err * 2.6)), abs(err)
+            k.ai_t = random.uniform(0.2, 0.6)
+        return max(-1.0, min(1.0, err * 3.2)), abs(err)
 
     def _step_kart(self, k, dt, steer, brake):
         if k.spin > 0:
@@ -603,7 +602,7 @@ class NeonKart(ov.BaseGame):
                 if k.finished:
                     look = self.track.pos(k.idx + 10)
                     st = max(-1.0, min(1.0, _wrap(math.atan2(look[1] - k.y, look[0] - k.x) - k.a) * 2.6))
-                self._step_kart(k, dt, st, err > 0.9 and k.speed > 180)
+                self._step_kart(k, dt, st, err > 1.2 and k.speed > 230)
             self._collide_karts()
             self._pickups(dt)
             self._update_rockets(dt)
@@ -977,7 +976,7 @@ class NeonKart(ov.BaseGame):
         for k in range(10):
             self._rect(c, 0, k * 42, W, 20, (1, 1, 1, 0.012))
         hue = _hsv((self.time * 0.2) % 1.0)
-        self._text(c, "NEON KART", W / 2, 362, 40, hue)
+        self._text(c, "KART", W / 2, 362, 40, hue)
         self._text(c, "Pick a track   -   %d laps, %d karts" % (LAPS, N_KARTS), W / 2, 332, 13, ov.C_TEXT)
         for i, t in enumerate(TRACKS):
             x, y, w, h = self._card(i)
@@ -1042,12 +1041,12 @@ class NeonKart(ov.BaseGame):
         self.draw_frame(c)
         bs, bt = self._best(self.track_i)
         if self.phase == 'menu':
-            self.draw_header(c, "NEON KART", "Best score and best time saved for every track", ov.C_GOLD)
+            self.draw_header(c, "KART", "Best score and best time saved for every track", ov.C_GOLD)
             self._menu(c)
             self.draw_hint(c, "Click or press 1-3 to choose a track   ESC quit")
             return
         if self.phase == 'augment':
-            self.draw_header(c, "NEON KART", "Augment draft", ov.C_GOLD)
+            self.draw_header(c, "KART", "Augment draft", ov.C_GOLD)
             self._augment_screen(c)
             self.draw_hint(c, "Click or press 1-3   M back to tracks")
             return
@@ -1086,7 +1085,7 @@ def _hsv(h):
     return [(1.0, t, p, 1.0), (q, 1.0, p, 1.0), (p, 1.0, t, 1.0), (p, q, 1.0, 1.0), (t, p, 1.0, 1.0), (1.0, p, q, 1.0)][i]
 
 
-RUNNER = ov.Runner("neonkart", GAME_NAME, NeonKart, [
+RUNNER = ov.Runner("kart", GAME_NAME, Kart, [
     "Mouse (or A / D): steer - the kart accelerates by itself",
     "S: brake    SPACE / click: use item",
     "Rainbow boxes: Boost, Rocket, Oil, Shield",
