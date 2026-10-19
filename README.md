@@ -7,7 +7,7 @@ You can see the full list inside "games" folder.
 
 <img width="2114" height="1390" alt="minigames" src="https://github.com/user-attachments/assets/6cf6bf0e-80b0-4987-95da-bdd3d26a717b" />
 
-https://github.com/user-attachments/assets/eb0f8b20-e401-4a86-94a5-c87207b5f149
+https://github.com/user-attachments/assets/d0a2fa52-b4cc-4045-8c4e-8974399e9e7c
 
 
 
